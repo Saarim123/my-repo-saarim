@@ -400,6 +400,9 @@ footer {
 .reserve-actions .btn { flex: 1; justify-content: center; }
 .reserve-note { font-size: 0.76rem; color: var(--muted); text-align: center; margin: 0; }
 .ticket-btn { width: 100%; justify-content: center; margin-bottom: 4px; border: none; cursor: pointer; font-family: 'Archivo', sans-serif; }
+.confirm-details { display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.confirm-row { display: flex; justify-content: space-between; gap: 14px; font-size: 0.92rem; }
+.confirm-label { color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; flex-shrink: 0; padding-top: 2px; }
 </style>
 </head>
 <body>
@@ -690,18 +693,39 @@ footer {
   </form>
 </dialog>
 
+<dialog id="reserve-confirm" class="reserve-dialog" aria-labelledby="confirm-title">
+  <div class="reserve-form">
+    <div class="reserve-head">
+      <h3 id="confirm-title">Reservation Ready</h3>
+      <button type="button" class="dialog-close" aria-label="Close" data-close-confirm>&times;</button>
+    </div>
+    <p class="reserve-sub">Your email app should have opened with these details pre-filled. If nothing opened, copy the details below and send them to us directly, or call the arena.</p>
+    <div class="confirm-details" id="confirm-details"></div>
+    <div class="reserve-actions">
+      <button type="button" class="btn btn-outline" id="copy-details-btn">Copy Details</button>
+      <button type="button" class="btn btn-solid" data-close-confirm>Done</button>
+    </div>
+    <p class="reserve-note">Send to: saarim.naeem@masjidalezz.com, sumaiyaht@gmail.com, shameen.mazhar.junior@gmail.com &mdash; or call (555) 014-0414.</p>
+  </div>
+</dialog>
+
 <script>
 (function () {
   var dialog = document.getElementById('reserve-dialog');
+  var confirmDialog = document.getElementById('reserve-confirm');
   if (!dialog) return;
   var form = document.getElementById('reserve-form');
   var dateInput = document.getElementById('reserve-date');
   var openers = document.querySelectorAll('[data-open-reserve]');
   var closers = dialog.querySelectorAll('[data-close-reserve]');
+  var confirmClosers = confirmDialog ? confirmDialog.querySelectorAll('[data-close-confirm]') : [];
+  var copyBtn = document.getElementById('copy-details-btn');
+  var lastDetailsText = '';
+  var iso = '';
 
   if (dateInput) {
     var today = new Date();
-    var iso = today.getFullYear() + '-' +
+    iso = today.getFullYear() + '-' +
       String(today.getMonth() + 1).padStart(2, '0') + '-' +
       String(today.getDate()).padStart(2, '0');
     dateInput.min = iso;
@@ -717,36 +741,85 @@ footer {
   dialog.addEventListener('click', function (e) {
     if (e.target === dialog) dialog.close();
   });
+  confirmClosers.forEach(function (btn) {
+    btn.addEventListener('click', function () { confirmDialog.close(); });
+  });
+  if (confirmDialog) {
+    confirmDialog.addEventListener('click', function (e) {
+      if (e.target === confirmDialog) confirmDialog.close();
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var data = new FormData(form);
-    var name = (data.get('name') || '').toString();
-    var party = (data.get('party') || '').toString();
-    var phone = (data.get('phone') || '').toString();
-    var date = (data.get('date') || '').toString();
-    var time = (data.get('time') || '').toString();
-    var notes = (data.get('notes') || '').toString();
+    var details = {
+      name: (data.get('name') || '').toString(),
+      party: (data.get('party') || '').toString(),
+      phone: (data.get('phone') || '').toString(),
+      date: (data.get('date') || '').toString(),
+      time: (data.get('time') || '').toString(),
+      notes: (data.get('notes') || '').toString()
+    };
 
-    var subject = 'Table Reservation Request \u2014 Saru WWE';
-    var body = [
-      'Name: ' + name,
-      'Party size: ' + party,
-      'Date: ' + date,
-      'Time: ' + time,
-      'Phone: ' + (phone || '(not provided)'),
-      'Notes: ' + (notes || '(none)')
+    var subject = 'Table Reservation Request - Saru WWE';
+    var bodyText = [
+      'Name: ' + details.name,
+      'Party size: ' + details.party,
+      'Date: ' + details.date,
+      'Time: ' + details.time,
+      'Phone: ' + (details.phone || '(not provided)'),
+      'Notes: ' + (details.notes || '(none)')
     ].join('\n');
+    lastDetailsText = subject + '\n\n' + bodyText;
 
     var mailto = 'mailto:saarim.naeem@masjidalezz.com,sumaiyaht@gmail.com,shameen.mazhar.junior@gmail.com' +
       '?subject=' + encodeURIComponent(subject) +
-      '&body=' + encodeURIComponent(body);
+      '&body=' + encodeURIComponent(bodyText);
 
-    window.location.href = mailto;
+    var rows = [
+      ['Name', details.name],
+      ['Party size', details.party],
+      ['Date', details.date],
+      ['Time', details.time],
+      ['Phone', details.phone || '(not provided)'],
+      ['Notes', details.notes || '(none)']
+    ];
+    var detailsEl = document.getElementById('confirm-details');
+    if (detailsEl) {
+      detailsEl.innerHTML = rows.map(function (r) {
+        return '<div class="confirm-row"><span class="confirm-label">' + r[0] + '</span><span>' + escapeHtml(r[1]) + '</span></div>';
+      }).join('');
+    }
+
     dialog.close();
     form.reset();
     if (dateInput) dateInput.value = iso;
+
+    window.location.href = mailto;
+
+    if (confirmDialog) {
+      window.setTimeout(function () { confirmDialog.showModal(); }, 250);
+    }
   });
+
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lastDetailsText).catch(function () {});
+      }
+      copyBtn.textContent = 'Copied';
+      window.setTimeout(function () { copyBtn.textContent = 'Copy Details'; }, 1500);
+    });
+  }
 })();
 </script>
 
