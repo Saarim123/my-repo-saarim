@@ -404,6 +404,7 @@ footer {
 .confirm-row { display: flex; justify-content: space-between; gap: 14px; font-size: 0.92rem; }
 .confirm-label { color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; flex-shrink: 0; padding-top: 2px; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
 
@@ -699,7 +700,7 @@ footer {
       <h3 id="confirm-title">Reservation Ready</h3>
       <button type="button" class="dialog-close" aria-label="Close" data-close-confirm>&times;</button>
     </div>
-    <p class="reserve-sub">Your email app should have opened with these details pre-filled. If nothing opened, copy the details below and send them to us directly, or call the arena.</p>
+    <p class="reserve-sub">Your reservation request has been sent. If you don't hear back, copy the details below and send them to us directly, or call the arena.</p>
     <div class="confirm-details" id="confirm-details"></div>
     <div class="reserve-actions">
       <button type="button" class="btn btn-outline" id="copy-details-btn">Copy Details</button>
@@ -711,6 +712,12 @@ footer {
 
 <script>
 (function () {
+  if (window.emailjs) {
+    emailjs.init({ publicKey: 'I25Vzdke-AdmgxV0Tm5pX' });
+  }
+  var EMAILJS_SERVICE_ID = 'service_pja9hyq';
+  var EMAILJS_TEMPLATE_ID = 'template_48jxxtp';
+
   var dialog = document.getElementById('reserve-dialog');
   var confirmDialog = document.getElementById('reserve-confirm');
   if (!dialog) return;
@@ -804,7 +811,14 @@ footer {
     form.reset();
     if (dateInput) dateInput.value = iso;
 
-    window.location.href = mailto;
+    if (window.emailjs) {
+      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, details).catch(function (err) {
+        console.error('EmailJS send failed, falling back to mailto:', err);
+        window.location.href = mailto;
+      });
+    } else {
+      window.location.href = mailto;
+    }
 
     if (confirmDialog) {
       window.setTimeout(function () { confirmDialog.showModal(); }, 250);
