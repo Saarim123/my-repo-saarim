@@ -266,6 +266,8 @@ nav a:hover, nav a[aria-current="page"] { border-color: var(--ink); }
   text-align: center;
 }
 .notice.show { display: block; }
+.notice.notice-error { border-color: #b3261e; color: #b3261e; }
+.account-view { display: none; text-align: center; }
 </style>
 </head>
 <body>
@@ -287,36 +289,178 @@ nav a:hover, nav a[aria-current="page"] { border-color: var(--ink); }
 
 <div class="login-shell">
   <div class="login-card">
-    <span class="login-eyebrow">Weigh-In</span>
-    <h1>Sign In</h1>
-    <span class="login-sub">Step onto the scale to book your table and track your bouts.</span>
 
-    <form id="login-form" novalidate>
-      <div class="field">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required>
-      </div>
-      <div class="field">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
-      </div>
-      <div class="field-row">
-        <label class="remember"><input type="checkbox" name="remember"> Remember me</label>
-        <a href="#" class="forgot">Forgot?</a>
-      </div>
-      <button type="submit" class="btn btn-solid">Enter the Ring</button>
-      <div class="notice" id="login-notice">This is a demo login form — it doesn't check real credentials yet.</div>
-    </form>
+    <div id="auth-view">
+      <span class="login-eyebrow">Weigh-In</span>
+      <h1 id="auth-title">Sign In</h1>
+      <span class="login-sub" id="auth-sub">Step onto the scale to book your table and track your bouts.</span>
 
-    <div class="divider">or</div>
-    <p class="signup-note">New here? <a href="#">Create an account</a></p>
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required minlength="6">
+        </div>
+        <div class="field-row" id="field-row">
+          <label class="remember"><input type="checkbox" name="remember" checked> Remember me</label>
+          <a href="#" class="forgot" id="forgot-link">Forgot?</a>
+        </div>
+        <button type="submit" class="btn btn-solid" id="auth-submit">Enter the Ring</button>
+        <div class="notice" id="login-notice"></div>
+      </form>
+
+      <div class="divider">or</div>
+      <p class="signup-note">New here? <a href="#" id="mode-toggle">Create an account</a></p>
+    </div>
+
+    <div id="account-view" class="account-view">
+      <span class="login-eyebrow">Ringside Pass</span>
+      <h1>You're In</h1>
+      <span class="login-sub">Signed in as <strong id="account-email"></strong></span>
+      <button type="button" class="btn btn-solid" id="logout-btn" style="margin-top:22px;">Log Out</button>
+      <p class="signup-note" style="margin-top:16px;"><a href="index.html">Back to Home</a></p>
+    </div>
+
   </div>
 </div>
 
-<script>
-  document.getElementById('login-form').addEventListener('submit', function (e) {
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, signOut, sendPasswordResetEmail,
+    setPersistence, browserLocalPersistence, browserSessionPersistence
+  } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyABjXLcJmXwR7w1o39TxrFl0E7h76YVwWM",
+    authDomain: "saarwwe.firebaseapp.com",
+    projectId: "saarwwe",
+    storageBucket: "saarwwe.firebasestorage.app",
+    messagingSenderId: "597218273530",
+    appId: "1:597218273530:web:4856d059301b6ec3c14143"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  const authView = document.getElementById('auth-view');
+  const accountView = document.getElementById('account-view');
+  const form = document.getElementById('login-form');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const rememberInput = form.querySelector('input[name="remember"]');
+  const noticeEl = document.getElementById('login-notice');
+  const titleEl = document.getElementById('auth-title');
+  const subEl = document.getElementById('auth-sub');
+  const submitBtn = document.getElementById('auth-submit');
+  const toggleLink = document.getElementById('mode-toggle');
+  const forgotLink = document.getElementById('forgot-link');
+  const fieldRow = document.getElementById('field-row');
+  const accountEmailEl = document.getElementById('account-email');
+  const logoutBtn = document.getElementById('logout-btn');
+
+  let mode = 'signin';
+
+  const COPY = {
+    signin: {
+      title: 'Sign In',
+      sub: 'Step onto the scale to book your table and track your bouts.',
+      submit: 'Enter the Ring',
+      toggle: 'Create an account'
+    },
+    signup: {
+      title: 'Join the Roster',
+      sub: 'Create an account to book tables and track your bouts.',
+      submit: 'Join the Roster',
+      toggle: 'Sign in instead'
+    }
+  };
+
+  function setMode(next) {
+    mode = next;
+    clearNotice();
+    const c = COPY[mode];
+    titleEl.textContent = c.title;
+    subEl.textContent = c.sub;
+    submitBtn.textContent = c.submit;
+    toggleLink.textContent = c.toggle;
+    fieldRow.style.display = mode === 'signup' ? 'none' : 'flex';
+  }
+
+  function showNotice(msg, isError) {
+    noticeEl.textContent = msg;
+    noticeEl.classList.add('show');
+    noticeEl.classList.toggle('notice-error', !!isError);
+  }
+  function clearNotice() {
+    noticeEl.classList.remove('show', 'notice-error');
+  }
+  function friendlyError(err) {
+    const map = {
+      'auth/invalid-email': 'That email address looks invalid.',
+      'auth/missing-password': 'Enter a password.',
+      'auth/weak-password': 'Password should be at least 6 characters.',
+      'auth/email-already-in-use': 'An account already exists with that email — try signing in instead.',
+      'auth/invalid-credential': 'Incorrect email or password.',
+      'auth/wrong-password': 'Incorrect email or password.',
+      'auth/user-not-found': 'No account found with that email.',
+      'auth/too-many-requests': 'Too many attempts — please wait a moment and try again.'
+    };
+    return map[err && err.code] || 'Something went wrong. Please try again.';
+  }
+
+  toggleLink.addEventListener('click', (e) => {
     e.preventDefault();
-    document.getElementById('login-notice').classList.add('show');
+    setMode(mode === 'signin' ? 'signup' : 'signin');
+  });
+
+  forgotLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const email = emailInput.value.trim();
+    if (!email) { showNotice('Enter your email above first, then click Forgot.', true); return; }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showNotice('Password reset email sent — check your inbox.', false);
+    } catch (err) {
+      showNotice(friendlyError(err), true);
+    }
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearNotice();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    submitBtn.disabled = true;
+    try {
+      await setPersistence(auth, rememberInput.checked ? browserLocalPersistence : browserSessionPersistence);
+      if (mode === 'signup') {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (err) {
+      showNotice(friendlyError(err), true);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  logoutBtn.addEventListener('click', () => signOut(auth));
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      authView.style.display = 'none';
+      accountView.style.display = 'block';
+      accountEmailEl.textContent = user.email;
+    } else {
+      authView.style.display = '';
+      accountView.style.display = 'none';
+    }
   });
 </script>
 

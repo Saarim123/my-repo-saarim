@@ -418,7 +418,7 @@ footer {
       <a href="#card">The Card</a>
       <a href="#rules">House Rules</a>
       <a href="#visit">Visit</a>
-      <a href="login.html">Login</a>
+      <a href="login.html" id="nav-login">Login</a>
     </nav>
   </div>
 </header>
@@ -838,5 +838,26 @@ footer {
 })();
 </script>
 
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyABjXLcJmXwR7w1o39TxrFl0E7h76YVwWM",
+    authDomain: "saarwwe.firebaseapp.com",
+    projectId: "saarwwe",
+    storageBucket: "saarwwe.firebasestorage.app",
+    messagingSenderId: "597218273530",
+    appId: "1:597218273530:web:4856d059301b6ec3c14143"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const navLogin = document.getElementById('nav-login');
+
+  onAuthStateChanged(auth, (user) => {
+    if (navLogin) navLogin.textContent = user ? 'Account' : 'Login';
+  });
+</script>
 </body>
 </html>
